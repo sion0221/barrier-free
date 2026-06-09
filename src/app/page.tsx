@@ -1,13 +1,11 @@
 "use client";
 
-import BarrierFreeDashboard from "@/components/dashboard/BarrierFreeDashboard";
-import ChatBot from "@/components/chat/ChatBot";
+import MainDashboard from "@/components/dashboard/MainDashboard";
 
 export default function Home() {
   return (
     <main className="min-h-screen w-full antialiased overflow-x-hidden">
-      <BarrierFreeDashboard />
-      <ChatBot />
+      <MainDashboard />
     </main>
   );
 }

@@ -24,3 +24,10 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 카카오맵 줌 컨트롤 위치 조정 */
+.kakao_map_zoom_wrap,
+[class*="zoom_wrap"],
+[class*="zoomWrap"] {
+  margin-top: 60px !important;
+}
