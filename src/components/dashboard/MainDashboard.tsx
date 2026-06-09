@@ -799,6 +799,13 @@ export default function MainDashboard() {
             )}
           </div>
 
+          <FilterPanel
+            filter={filter}
+            onChange={(patch) => setFilter((f) => ({ ...f, ...patch }))}
+            onReset={() => setFilter(DEFAULT_FILTER)}
+            onSearch={() => setSearchTrigger((n) => n + 1)}
+          />
+
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-800">
               맞춤 판정 결과{" "}
@@ -1040,12 +1047,6 @@ export default function MainDashboard() {
             )}
           </div>
 
-          <FilterPanel
-            filter={filter}
-            onChange={(patch) => setFilter((f) => ({ ...f, ...patch }))}
-            onReset={() => setFilter(DEFAULT_FILTER)}
-            onSearch={() => setSearchTrigger((n) => n + 1)}
-          />
         </aside>
       </div>
 
