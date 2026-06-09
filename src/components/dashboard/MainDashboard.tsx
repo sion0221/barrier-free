@@ -38,7 +38,6 @@ type FilterState = {
   radius: string;
   userTypes: string[];
   conditions: string[];
-  courseRecommend: boolean;
 };
 
 const DEFAULT_FILTER: FilterState = {
@@ -46,7 +45,6 @@ const DEFAULT_FILTER: FilterState = {
   radius: "3km",
   userTypes: [],
   conditions: [],
-  courseRecommend: false,
 };
 
 function buildQueryFromFilter(f: FilterState): string {
@@ -65,7 +63,6 @@ function buildQueryFromFilter(f: FilterState): string {
   if (userTypes.length > 0) q += ` 동행자: ${userTypes.join(", ")}.`;
   if (conditions.length > 0) q += ` 필수 시설: ${conditions.join(", ")}.`;
   if (f.userTypes.includes("pet")) q += " 반려동물 동반 가능한 곳으로 찾아줘.";
-  if (f.courseRecommend) q += " 하루 코스로 추천해줘.";
   return q;
 }
 
@@ -201,16 +198,16 @@ function PlaceCard({ card }: { card: PlaceCardData }) {
 }
 
 // ── CheckGroup ────────────────────────────────────────
-function CheckGroup({ options, selected, onChange }: { options: { id: string; label: string }[]; selected: string[]; onChange: (id: string) => void }) {
+function CheckGroup({ options, selected, onChange, disabled = false }: { options: { id: string; label: string }[]; selected: string[]; onChange: (id: string) => void; disabled?: boolean }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => {
         const checked = selected.includes(opt.id);
         return (
-          <label key={opt.id} tabIndex={0}
-            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onChange(opt.id); } }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium cursor-pointer transition select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${checked ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-700 border-slate-200 hover:border-green-400 hover:text-green-700"}`}>
-            <input type="checkbox" tabIndex={-1} className="sr-only" checked={checked} onChange={() => onChange(opt.id)} />
+          <label key={opt.id} tabIndex={disabled ? -1 : 0}
+            onKeyDown={(e) => { if (!disabled && (e.key === " " || e.key === "Enter")) { e.preventDefault(); onChange(opt.id); } }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"} ${checked ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-700 border-slate-200 " + (disabled ? "" : "hover:border-green-400 hover:text-green-700")}`}>
+            <input type="checkbox" tabIndex={-1} className="sr-only" checked={checked} disabled={disabled} onChange={() => !disabled && onChange(opt.id)} />
             {opt.label}
           </label>
         );
@@ -227,7 +224,7 @@ function FilterPanel({ filter, onChange, onReset, onSearch, isLoading }: { filte
     onChange({ [field]: arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id] });
   };
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-sm divide-y divide-slate-100">
+    <div className={`bg-white border border-slate-200 rounded-xl shadow-sm divide-y divide-slate-100 ${isLoading ? "opacity-60 cursor-not-allowed" : ""}`}>
       <div className="px-5 py-4">
         <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
@@ -236,15 +233,17 @@ function FilterPanel({ filter, onChange, onReset, onSearch, isLoading }: { filte
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-white focus-within:border-green-500 focus-within:ring-2 focus-within:ring-green-500 transition">
             <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-            <input className="w-full text-sm outline-none bg-transparent placeholder:text-slate-400"
+            <input className="w-full text-sm outline-none bg-transparent placeholder:text-slate-400 disabled:cursor-not-allowed"
               placeholder="예: 서울역, 경복궁" value={filter.locationText}
+              disabled={isLoading}
               onChange={(e) => onChange({ locationText: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") onSearch(); }} />
           </div>
           <div className="flex flex-wrap gap-2">
             {RADIUS_OPTIONS.map((r) => (
               <button key={r} onClick={() => onChange({ radius: r })}
-                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${filter.radius === r ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-700 border-slate-200 hover:border-green-400"}`}>
+                disabled={isLoading}
+                className={`px-4 py-1.5 rounded-lg border text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:cursor-not-allowed ${filter.radius === r ? "bg-green-600 text-white border-green-600" : "bg-white text-slate-700 border-slate-200 enabled:hover:border-green-400"}`}>
                 {r}
               </button>
             ))}
@@ -258,41 +257,24 @@ function FilterPanel({ filter, onChange, onReset, onSearch, isLoading }: { filte
               <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
               사용자 유형
             </div>
-            <CheckGroup options={USER_TYPE_OPTIONS} selected={filter.userTypes} onChange={(id) => toggle("userTypes", id)} />
+            <CheckGroup options={USER_TYPE_OPTIONS} selected={filter.userTypes} onChange={(id) => toggle("userTypes", id)} disabled={isLoading} />
           </div>
           <div className="px-5 py-4">
             <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
               <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">3</span>
               필수 시설 조건
             </div>
-            <CheckGroup options={CONDITION_OPTIONS} selected={filter.conditions} onChange={(id) => toggle("conditions", id)} />
-          </div>
-          <div className="px-5 py-4">
-            <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">4</span>
-              코스 추천
-            </div>
-            <label className="inline-flex items-center gap-3 cursor-pointer select-none">
-              <div role="switch" aria-checked={filter.courseRecommend} tabIndex={0}
-                onClick={() => onChange({ courseRecommend: !filter.courseRecommend })}
-                onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onChange({ courseRecommend: !filter.courseRecommend }); } }}
-                className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 ${filter.courseRecommend ? "bg-green-600" : "bg-slate-200"}`}>
-                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${filter.courseRecommend ? "translate-x-5" : "translate-x-0.5"}`} />
-              </div>
-              <span className={`text-sm font-medium ${filter.courseRecommend ? "text-green-700" : "text-slate-600"}`}>
-                {filter.courseRecommend ? "코스로 묶어서 추천받기" : "코스 추천 안 함"}
-              </span>
-            </label>
+            <CheckGroup options={CONDITION_OPTIONS} selected={filter.conditions} onChange={(id) => toggle("conditions", id)} disabled={isLoading} />
           </div>
         </>
       )}
-      <button onClick={() => setExpanded((p) => !p)} aria-expanded={expanded}
-        className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm text-slate-500 hover:text-green-700 hover:bg-green-50 font-medium transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
+      <button onClick={() => setExpanded((p) => !p)} disabled={isLoading} aria-expanded={expanded}
+        className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm text-slate-500 enabled:hover:text-green-700 enabled:hover:bg-green-50 font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:cursor-not-allowed">
         {expanded ? <><ChevronUp className="w-4 h-4" /> 필터 접기</> : <><ChevronDown className="w-4 h-4" /> 필터 더 보기</>}
       </button>
       <div className="px-5 py-4 flex items-center justify-between bg-slate-50 rounded-b-xl">
-        <button onClick={onReset} className="text-sm text-slate-500 hover:text-slate-800 font-medium transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded">초기화</button>
-        <button onClick={onSearch} disabled={isLoading} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500">
+        <button onClick={onReset} disabled={isLoading} className="text-sm text-slate-500 enabled:hover:text-slate-800 font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded disabled:cursor-not-allowed">초기화</button>
+        <button onClick={onSearch} disabled={isLoading} className="flex items-center gap-2 px-5 py-2.5 bg-green-600 enabled:hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:cursor-not-allowed">
           {isLoading ? (<svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>) : (<Search className="w-4 h-4" />)} {isLoading ? "검색 중..." : "필터 검색"}
         </button>
       </div>
@@ -427,12 +409,14 @@ export default function MainDashboard() {
                 className="flex-1 text-sm outline-none bg-transparent placeholder:text-slate-400 text-slate-800 resize-none leading-relaxed"
                 placeholder="예: 서울역 근처 휠체어 이용 가능한 배리어프리 카페 찾아줘"
                 value={searchText}
+                disabled={isLoading}
                 onChange={(e) => setSearchText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (searchText.trim()) setSearchTrigger((n) => n + 1); } }}
               />
               {searchText && (
                 <button onClick={() => setSearchText("")}
-                  className="text-slate-400 hover:text-slate-600 cursor-pointer mt-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded"
+                  disabled={isLoading}
+                  className="text-slate-400 enabled:hover:text-slate-600 cursor-pointer mt-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 rounded disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="검색어 지우기">
                   <X className="w-4 h-4" />
                 </button>
@@ -442,14 +426,15 @@ export default function MainDashboard() {
               <div className="flex gap-2 flex-wrap">
                 {EXAMPLE_QUERIES.slice(0, 2).map((q) => (
                   <button key={q} onClick={() => setSearchText(q)}
-                    className="text-xs text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-full px-2.5 py-1 transition cursor-pointer truncate max-w-[180px]">
+                    disabled={isLoading}
+                    className="text-xs text-green-700 bg-green-50 enabled:hover:bg-green-100 border border-green-200 rounded-full px-2.5 py-1 transition cursor-pointer truncate max-w-[180px] disabled:cursor-not-allowed disabled:opacity-40">
                     {q}
                   </button>
                 ))}
               </div>
               <button onClick={() => { if (searchText.trim()) setSearchTrigger((n) => n + 1); }}
                 disabled={!searchText.trim() || isLoading}
-                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white text-sm font-semibold rounded-lg transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 shrink-0">
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 enabled:hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 shrink-0">
                 {isLoading ? (<svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>) : (<Search className="w-3.5 h-3.5" />)} {isLoading ? "검색 중..." : "검색"}
               </button>
             </div>
@@ -503,10 +488,8 @@ export default function MainDashboard() {
 
           {/* 초기 상태 */}
           {!isLoading && !hasSearched && (
-            <div className="text-center py-16 bg-white border border-slate-200 rounded-xl">
-              <div className="text-4xl mb-3">♿</div>
-              <p className="font-semibold text-slate-500 mb-1">배리어프리 장소를 검색해 보세요</p>
-              <p className="text-sm text-slate-400">위 검색창에 원하는 조건을 입력하거나 예시 쿼리를 클릭하세요.</p>
+            <div className="bg-white border border-slate-200 rounded-xl py-16 text-center">
+              <p className="text-sm text-slate-400">검색을 활용하여 원하는 장소를 찾아보세요.</p>
             </div>
           )}
 
