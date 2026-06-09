@@ -484,31 +484,33 @@ function FilterPanel({
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm divide-y divide-slate-100">
-      {sections.filter(({ num }) => num === 1 || expanded).map(({ num, title, tooltip, content }) => (
-        <div key={num} className="px-5 py-4">
-          <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-              {num}
-            </span>
-            {title}
-            {tooltip && (
-              <div className="relative group ml-auto">
-                <button
-                  className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-1"
-                  aria-label={`${title} 안내`}
-                >
-                  <Info className="w-3 h-3 text-slate-500" />
-                </button>
-                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-60 bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-[0_4px_20px_rgba(0,0,0,0.10)]">
-                  {tooltip}
-                  <div className="absolute top-1/2 -translate-y-1/2 left-[-5px] w-2.5 h-2.5 bg-white border-l border-b border-slate-200 rotate-45" />
+      {sections
+        .filter(({ num }) => num === 1 || expanded)
+        .map(({ num, title, tooltip, content }) => (
+          <div key={num} className="px-5 py-4">
+            <div className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-green-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                {num}
+              </span>
+              {title}
+              {tooltip && (
+                <div className="relative group ml-auto">
+                  <button
+                    className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-1"
+                    aria-label={`${title} 안내`}
+                  >
+                    <Info className="w-3 h-3 text-slate-500" />
+                  </button>
+                  <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 w-60 bg-white border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-600 leading-relaxed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-[0_4px_20px_rgba(0,0,0,0.10)]">
+                    {tooltip}
+                    <div className="absolute top-1/2 -translate-y-1/2 left-[-5px] w-2.5 h-2.5 bg-white border-l border-b border-slate-200 rotate-45" />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            {content}
           </div>
-          {content}
-        </div>
-      ))}
+        ))}
       <button
         onClick={() => setExpanded((p) => !p)}
         aria-expanded={expanded}
@@ -516,9 +518,13 @@ function FilterPanel({
         className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 text-sm text-slate-500 hover:text-green-700 hover:bg-green-50 font-medium transition cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 border-t border-slate-100"
       >
         {expanded ? (
-          <><ChevronUp className="w-4 h-4" /> 필터 접기</>
+          <>
+            <ChevronUp className="w-4 h-4" /> 필터 접기
+          </>
         ) : (
-          <><ChevronDown className="w-4 h-4" /> 필터 더 보기</>
+          <>
+            <ChevronDown className="w-4 h-4" /> 필터 더 보기
+          </>
         )}
       </button>
       <div className="px-5 py-4 flex items-center justify-between bg-slate-50 rounded-b-xl">
@@ -1043,10 +1049,11 @@ export default function MainDashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-600 mt-3">제외된 장소가 없습니다.</p>
+              <p className="text-sm text-slate-600 mt-3">
+                제외된 장소가 없습니다.
+              </p>
             )}
           </div>
-
         </aside>
       </div>
 

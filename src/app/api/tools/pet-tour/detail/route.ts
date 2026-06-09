@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     });
     try {
       const url =
-        "https://apis.data.go.kr/B551011/KorPetTourService/detailPetTour1?" +
+        "https://apis.data.go.kr/B551011/KorPetTourService2/detailPetTour2?" +
         params.toString();
       const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
     try {
       const url =
-        "https://apis.data.go.kr/B551011/KorPetTourService/locationBasedList1?" +
+        "https://apis.data.go.kr/B551011/KorPetTourService2/locationBasedList2?" +
         params.toString();
       const res = await fetch(url, { cache: "no-store" });
       if (res.ok) {

@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   });
 
   const url =
-    "https://apis.data.go.kr/B551011/TarRlteTarService/locationBasedList1?" +
+    "https://apis.data.go.kr/B551011/KorWithService2/locationBasedList2?" +
     params.toString();
 
   try {

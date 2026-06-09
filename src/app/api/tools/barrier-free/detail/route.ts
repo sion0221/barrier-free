@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     });
 
     const url =
-      "https://apis.data.go.kr/B551011/TarRlteTarService/detailWithTour1?" +
+      "https://apis.data.go.kr/B551011/KorWithService2/detailWithTour2?" +
       params.toString();
 
     try {
