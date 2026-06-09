@@ -1,54 +1,13 @@
 import { NextResponse } from "next/server";
 import type { BarrierFreeDashboardResponse } from "@/types";
 
-interface FilterBody {
-  locationText?: string;
-  destination?: string;
-  radius?: number;
-  userTypes?: string[];
-  conditions?: string[];
-  preferences?: string[];
-  excludes?: string[];
-  courseRecommend?: boolean;
-}
-
-function buildQuery(body: FilterBody): string {
-  const location = body.locationText || body.destination || "서울역";
-  const radius = (body.radius || 3000) / 1000;
-
-  const conditionMap: Record<string, string> = {
-    route:    "경사로/보행로 접근",
-    elevator: "엘리베이터",
-    restroom: "장애인 화장실",
-    babycar:  "유모차 대여",
-    pet:      "반려동물 동반",
-  };
-  const userTypeMap: Record<string, string> = {
-    wheelchair:    "휠체어 이용자",
-    senior:        "고령자",
-    infant:        "영유아 동반자",
-    pet_companion: "반려동물 동반자",
-    general:       "일반 동행자",
-  };
-
-  const conditions = (body.conditions || []).map((c) => conditionMap[c] || c);
-  const userTypes  = (body.userTypes  || []).map((t) => userTypeMap[t] || t);
-
-  let query = `${location} 근처 반경 ${radius}km 내 배리어프리 관광지를 찾아줘.`;
-  if (userTypes.length > 0)  query += ` 동행자: ${userTypes.join(", ")}.`;
-  if (conditions.length > 0) query += ` 필수 조건: ${conditions.join(", ")}.`;
-  if (body.preferences?.includes("pet")) query += " 반려동물 동반 가능한 곳이면 좋겠어.";
-  if (body.courseRecommend) query += " 하루 코스로 추천해줘.";
-
-  return query;
-}
-
 export async function POST(request: Request) {
-  let body: FilterBody = {};
-  try {
-    body = (await request.json()) as FilterBody;
-  } catch {
-    body = {};
+  let body: { query?: string } = {};
+  try { body = await request.json(); } catch { body = {}; }
+
+  const query = (body.query ?? "").trim();
+  if (!query) {
+    return NextResponse.json({ success: false, error: "검색어를 입력해 주세요." }, { status: 400 });
   }
 
   const apiKey  = process.env.ENNOIA_API_KEY;
@@ -57,91 +16,109 @@ export async function POST(request: Request) {
 
   if (!apiKey || !project || !hash) {
     console.error("[/api/tour] Ennoia 환경변수 누락:", { apiKey: !!apiKey, project: !!project, hash: !!hash });
-    return NextResponse.json(
-      { success: false, error: "Ennoia 환경변수가 설정되지 않았습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Ennoia 환경변수가 설정되지 않았습니다." }, { status: 500 });
   }
 
-  const query = buildQuery(body);
-  console.log("[/api/tour] Ennoia 요청 쿼리:", query);
+  console.log("[/api/tour] Ennoia 멀티에이전트 요청:", query);
 
   try {
-    const res = await fetch("https://api.ennoia.so/api/preset/v2/chat/completions", {
+    const url = `https://api.ennoia.so/api/llm-orchestrator/chat/stream/${hash}/2`;
+    const res = await fetch(url, {
       method: "POST",
-      headers: {
-        project,
-        apiKey,
-        "Content-Type": "application/json; charset=utf-8",
-      },
-      body: JSON.stringify({
-        hash,
-        params: {},
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: query }],
-          },
-        ],
-      }),
+      headers: { project, apiKey, "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ messages: [{ role: "user", content: query }] }),
       cache: "no-store",
     });
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("[/api/tour] Ennoia HTTP 오류:", res.status, text.slice(0, 300));
-      return NextResponse.json(
-        { success: false, error: `Ennoia API 오류: ${res.status}` },
-        { status: 500 }
-      );
+      console.error("[/api/tour] Ennoia HTTP 오류:", res.status, text.slice(0, 500));
+      return NextResponse.json({ success: false, error: `Ennoia API 오류: ${res.status}`, detail: text.slice(0, 300) }, { status: 500 });
     }
 
-    const data = await res.json();
-    console.log("[/api/tour] Ennoia 원본 응답:", JSON.stringify(data).slice(0, 500));
+    // SSE 스트림 수집
+    const reader = res.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = "";
+    let buf = "";
 
-    // Ennoia 응답에서 content 추출 (OpenAI 호환 포맷)
-    const content: string =
-      data?.choices?.[0]?.message?.content ??
-      data?.message?.content ??
-      data?.content ??
-      "";
+    if (reader) {
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          const raw = line.slice(5).trim();
+          if (raw === "[DONE]") break outer;
+          try {
+            const chunk = JSON.parse(raw) as Record<string, unknown>;
+            const choices = chunk?.choices as Array<Record<string, unknown>> | undefined;
+            const delta =
+              (choices?.[0]?.delta as Record<string, unknown>)?.content ??
+              (choices?.[0]?.message as Record<string, unknown>)?.content ??
+              chunk?.content ?? "";
+            fullContent += String(delta ?? "");
+          } catch { /* ignore */ }
+        }
+      }
+    }
 
-    // content가 JSON 문자열이면 파싱
+    console.log("[/api/tour] 수집 응답(앞200):", fullContent.slice(0, 200));
+
+    const defaultQuery = {
+      locationText: query,
+      mapX: null as number | null,
+      mapY: null as number | null,
+      radius: 3000,
+      userTypes: [] as string[],
+      requiredConditions: [] as string[],
+      optionalConditions: [] as string[],
+    };
+
     let result: BarrierFreeDashboardResponse;
     try {
-      const parsed = typeof content === "string" ? JSON.parse(content) : content;
+      // 모든 JSON 블록 추출 (마크다운 코드블록 + 일반 {})
+      const blocks: string[] = [];
+      for (const m of fullContent.matchAll(/```json\s*([\s\S]*?)```/g)) {
+        blocks.push(m[1].trim());
+      }
+      let depth = 0, start = -1;
+      for (let i = 0; i < fullContent.length; i++) {
+        if (fullContent[i] === "{") { if (depth === 0) start = i; depth++; }
+        else if (fullContent[i] === "}") {
+          depth--;
+          if (depth === 0 && start !== -1) { blocks.push(fullContent.slice(start, i + 1)); start = -1; }
+        }
+      }
+
+      // 뒤에서부터 summary + cards 가진 블록 찾기
+      let parsed: Record<string, unknown> | null = null;
+      for (let i = blocks.length - 1; i >= 0; i--) {
+        try {
+          const candidate = JSON.parse(blocks[i]) as Record<string, unknown>;
+          if ("summary" in candidate && "cards" in candidate) { parsed = candidate; break; }
+        } catch (_e) { /* skip */ }
+      }
+      if (!parsed) throw new Error("no valid JSON");
+
       result = {
-        summary:       parsed.summary        ?? "결과를 가져왔습니다.",
-        query:         parsed.query          ?? {
-          locationText:       body.locationText || "서울역",
-          mapX:               null,
-          mapY:               null,
-          radius:             body.radius || 3000,
-          userTypes:          body.userTypes || [],
-          requiredConditions: body.conditions || [],
-          optionalConditions: body.preferences || [],
-        },
-        cards:          parsed.cards          ?? [],
-        excludedPlaces: parsed.excludedPlaces ?? [],
-        warnings:       parsed.warnings       ?? [],
+        summary: typeof parsed.summary === "string" ? parsed.summary : "결과를 가져왔습니다.",
+        query: (parsed.query as typeof defaultQuery) ?? defaultQuery,
+        cards: Array.isArray(parsed.cards) ? parsed.cards : [],
+        excludedPlaces: Array.isArray(parsed.excludedPlaces) ? parsed.excludedPlaces : [],
+        warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
       };
-    } catch {
-      // JSON 파싱 실패 시 텍스트 요약으로 반환
-      console.warn("[/api/tour] JSON 파싱 실패, 텍스트 응답 처리");
+    } catch (_e) {
+      console.warn("[/api/tour] JSON 파싱 실패");
       result = {
-        summary:       typeof content === "string" ? content : "결과를 가져왔습니다.",
-        query: {
-          locationText:       body.locationText || "서울역",
-          mapX:               null,
-          mapY:               null,
-          radius:             body.radius || 3000,
-          userTypes:          body.userTypes || [],
-          requiredConditions: body.conditions || [],
-          optionalConditions: body.preferences || [],
-        },
-        cards:          [],
+        summary: "검색 결과를 파싱하지 못했습니다. 에이전트 설정을 확인하세요.",
+        query: defaultQuery,
+        cards: [],
         excludedPlaces: [],
-        warnings:       ["응답을 카드 형태로 파싱하지 못했습니다. 에이전트 설정을 확인하세요."],
+        warnings: ["에이전트 응답을 카드 형태로 파싱하지 못했습니다."],
       };
     }
 
